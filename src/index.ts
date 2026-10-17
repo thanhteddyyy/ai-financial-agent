@@ -1,8 +1,11 @@
-import express, { Express, Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
-import cryptoRoutes from './routes/cryptoRoutes';
 
+// Load environment variables BEFORE importing other modules
 dotenv.config();
+
+import express, { Express, Request, Response, NextFunction } from 'express';
+import cryptoRoutes from './routes/cryptoRoutes';
+import aiRoutes from './routes/aiRoutes';
 
 const app: Express = express();
 const PORT: number = parseInt(process.env.PORT || '3000', 10);
@@ -26,6 +29,9 @@ app.get('/health', (req: Request, res: Response) => {
 
 // Crypto routes
 app.use('/api/crypto', cryptoRoutes);
+
+// AI Agent routes
+app.use('/api/ai', aiRoutes);
 
 // Error handling middleware
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
