@@ -1,7 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import cryptoService from './cryptoService';
 import { AiAgentResponse } from '../types/gemini';
-
+import { currencyService } from './currencyService';
 interface MessagePart {
   text?: string;
   functionCall?: {
@@ -17,7 +17,7 @@ interface Message {
 
 class GeminiService {
   private ai: GoogleGenAI | null = null;
-  private model: string = 'gemini-2.5-flash';
+  private model: string = 'gemini-2.5-flash'; //lazy init
 
   private initializeAi(): void {
     if (this.ai !== null) return;
@@ -52,7 +52,30 @@ class GeminiService {
       },
     };
   }
-
+private getConvertCurrencyTool() {
+  return {
+    name: 'convertCurrency',
+    description: 'Quy đổi một số tiền từ loại tiền tệ này sang loại tiền tệ khác (ví dụ: đổi từ USD sang VND, EUR sang USD, USD sang JPY).',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        amount: {
+          type: 'NUMBER',
+          description: 'Số lượng tiền cần quy đổi.',
+        },
+        from: {
+          type: 'STRING',
+          description: 'Mã tiền tệ nguồn dạng 3 chữ cái viết hoa (ví dụ: USD, EUR).',
+        },
+        to: {
+          type: 'STRING',
+          description: 'Mã tiền tệ đích dạng 3 chữ cái viết hoa (ví dụ: VND, USD, JPY).',
+        },
+      },
+      required: ['amount', 'from', 'to'],
+    },
+  };
+}
   /**
    * Execute the getCryptoPrice tool with given arguments
    */
@@ -85,7 +108,10 @@ class GeminiService {
       // Initialize AI on first use (lazy initialization)
       this.initializeAi();
 
-      const toolDefinitions = [this.getGetCryptoPriceTool()];
+      const toolDefinitions = [
+        this.getGetCryptoPriceTool(),
+        this.getConvertCurrencyTool(),
+      ];
 
       const messages: Message[] = [
         {
@@ -100,7 +126,7 @@ class GeminiService {
       const maxIterations = 10;
 
       const requestConfig = {
-        systemInstruction: 'You are an AI Financial Agent. When users ask for current/real-time cryptocurrency prices, you MUST use the getCryptoPrice tool to fetch live data.',
+        systemInstruction: 'You are an AI Financial Agent. You have tools to check real-time crypto prices (getCryptoPrice) and convert currencies (convertCurrency). Always use these tools when users ask for real-time prices or currency conversions.',
         tools: [
           {
             functionDeclarations: toolDefinitions,
@@ -180,6 +206,17 @@ class GeminiService {
 
             if (name === 'getCryptoPrice') {
               toolResult = await this.executeCryptoTool(args);
+            } else if (name === 'convertCurrency') {
+              try {
+                const amount = Number(args.amount);
+                const from = String(args.from);
+                const to = String(args.to);
+
+                const result = await currencyService.convertCurrency(amount, from, to);
+                toolResult = JSON.stringify(result);
+              } catch (err) {
+                toolResult = JSON.stringify({ error: (err as Error).message });
+              }
             } else {
               toolResult = JSON.stringify({ error: `Unknown tool: ${name}` });
             }
