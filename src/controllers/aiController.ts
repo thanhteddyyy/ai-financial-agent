@@ -5,6 +5,7 @@ import { ApiResponse } from '../types/crypto';
 interface AskAiRequest extends Request {
   body: {
     prompt?: string;
+    sessionId?: string;
   };
 }
 
@@ -20,7 +21,7 @@ class AiController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { prompt } = req.body;
+      const { prompt, sessionId } = req.body;
 
       if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
         res.status(400).json({
@@ -31,7 +32,7 @@ class AiController {
         return;
       }
 
-      const result = await geminiService.askAiAgent(prompt.trim());
+      const result = await geminiService.askAiAgent(prompt, sessionId);
 
       if (result.status === 'error') {
         res.status(500).json({
